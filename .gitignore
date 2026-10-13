@@ -1,0 +1,27 @@
+# 依赖
+node_modules/
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# 编辑器 / 系统
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
+
+# 构建产物
+dist/
+build/
+unpackage/
+*.log
+npm-debug.log*
+
+# WorkBuddy 项目数据（非源码）
+.codebuddy/
+
+# 临时文件
+*.tmp
+.cache/
