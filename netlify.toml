@@ -3,6 +3,11 @@
   publish = "."
   functions = "netlify/functions"
 
+# AI_API_BASE / AI_MODEL 与代码默认值相同，不是真正密钥；避免误拦部署
+[build.environment]
+  SECRETS_SCAN_OMIT_KEYS = "AI_API_BASE,AI_MODEL"
+  SECRETS_SCAN_OMIT_PATHS = "netlify-import.env,.env.example"
+
 [[headers]]
   for = "/sw.js"
   [headers.values]
