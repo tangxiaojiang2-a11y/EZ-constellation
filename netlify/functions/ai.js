@@ -1,5 +1,5 @@
 // 把用户页面的解读请求转到 OpenAI 兼容接口。
-// 密钥优先：请求 Authorization > Blobs(setup 同步) > 环境变量 AI_API_KEY。
+// 密钥优先：环境变量 AI_API_KEY（开箱即用）> Blobs 旧配置 > 请求 Authorization（兼容）。
 
 const ALLOWED = {
   "https://api.deepseek.com": true,
@@ -54,25 +54,27 @@ exports.handler = async function (event) {
     const saved = await savedSettings();
     const auth = event.headers.authorization || event.headers.Authorization || "";
     const userKey = auth.replace(/^Bearer\s+/i, "").trim();
-    // 兼容常见变量名，避免后台起了别名却读不到
-    const siteKey = (saved && saved.apiKey)
-      || process.env.AI_API_KEY
+    // 兼容常见变量名；环境变量优先，保证站长配一次全站开箱即用
+    const siteKey = process.env.AI_API_KEY
       || process.env.DEEPSEEK_API_KEY
       || process.env.OPENAI_API_KEY
+      || (saved && saved.apiKey)
       || "";
     const siteBase = cleanBase(
-      (saved && saved.base)
-      || process.env.AI_API_BASE
+      process.env.AI_API_BASE
       || process.env.DEEPSEEK_API_BASE
       || process.env.OPENAI_BASE_URL
+      || (saved && saved.base)
       || "https://api.deepseek.com"
     );
-    const textModel = (saved && saved.model)
-      || process.env.AI_MODEL
+    const textModel = process.env.AI_MODEL
       || process.env.DEEPSEEK_MODEL
       || process.env.OPENAI_MODEL
+      || (saved && saved.model)
       || "deepseek-chat";
-    const visionModel = (saved && saved.visionModel) || process.env.AI_VISION_MODEL || textModel;
+    const visionModel = process.env.AI_VISION_MODEL
+      || (saved && saved.visionModel)
+      || textModel;
 
     const image = JSON.stringify(body.messages).indexOf("image_url") !== -1;
     let base;
@@ -90,7 +92,7 @@ exports.handler = async function (event) {
       key = siteKey;
       model = image ? visionModel : textModel;
     } else {
-      return { statusCode: 401, headers: h, body: JSON.stringify({ error: { message: "未配置 API Key：请在 Netlify 设置 AI_API_KEY，或打开 /setup.html 保存密钥" } }) };
+      return { statusCode: 401, headers: h, body: JSON.stringify({ error: { message: "站点未配置模型密钥" } }) };
     }
 
     const payload = {

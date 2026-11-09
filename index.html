@@ -2356,15 +2356,10 @@ function _aiFetch(body, timeoutMs){
   var url = cfg.base + '/chat/completions';
   var headers = { 'Content-Type': 'application/json' };
   if (aiHosted()){
+    // 托管站：一律走站点密钥，用户无需配置、无需打开第二页
     url = '/.netlify/functions/ai';
-    if (cfg.key){
-      headers.Authorization = 'Bearer ' + cfg.key;
-      body.base = cfg.base;
-      if (!body.model) body.model = cfg.model;
-    } else {
-      delete body.model;
-      delete body.base;
-    }
+    delete body.model;
+    delete body.base;
   } else if (cfg.key){
     headers.Authorization = 'Bearer ' + cfg.key;
   } else {
@@ -3606,13 +3601,9 @@ function renderZodiacAI(key, d){
     window._zAICache[cacheKey] = h;
     box.innerHTML = h;
     var localBox = $('zodiacLocalDims'); if (localBox) localBox.style.display = 'none';
-  }).catch(function(err){
-    var msg = (err && err.message) ? String(err.message).slice(0, 120) : '模型暂时不可用';
-    box.innerHTML = '<div class="card" style="margin-top:14px;">'
-      + '<p class="tip">深度分析未生成：' + esc(msg) + '</p>'
-      + '<p class="tip" style="margin-top:8px;">手机上请先打开配置页保存密钥，再用同一个浏览器回来点重新生成。</p>'
-      + '<a class="btn-main" href="setup.html" style="display:block;text-align:center;text-decoration:none;margin-top:10px;">去配置密钥</a>'
-      + '<button class="btn-ghost" style="margin-top:8px;" onclick="window._zAICache={};showZodiacDetail(\'' + key + '\')">重新生成</button></div>';
+  }).catch(function(){
+    // 用户侧开箱即用：失败时不引导配置页，保留上方本地完整解读
+    box.innerHTML = '';
   });
 }
 function setZodiacGender(g, key){
@@ -3687,9 +3678,8 @@ function renderPairAI(k1, k2, r){
     window._pAICache[cacheKey] = h;
     box.innerHTML = h;
     var localBox = $('pairLocalDims'); if (localBox) localBox.style.display = 'none';
-  }).catch(function(err){
-    var msg = (err && err.message) ? String(err.message).slice(0, 120) : '模型暂时不可用';
-    box.innerHTML = '<div class="card" style="margin-top:14px;"><p class="tip">深度配对未生成：' + esc(msg) + '。上方速览仍可阅读。</p></div>';
+  }).catch(function(){
+    box.innerHTML = '';
   });
 }
 
