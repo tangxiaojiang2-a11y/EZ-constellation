@@ -1,7 +1,5 @@
 // 把用户页面的解读请求转到 OpenAI 兼容接口。
-// 密钥优先用 setup.html 保存的那一份，没有时才看环境变量。
-
-const { getStore } = require("@netlify/blobs");
+// 密钥优先：请求 Authorization > Blobs(setup 同步) > 环境变量 AI_API_KEY。
 
 const ALLOWED = {
   "https://api.deepseek.com": true,
@@ -28,6 +26,7 @@ function cleanBase(value) {
 
 async function savedSettings() {
   try {
+    const { getStore } = require("@netlify/blobs");
     const store = getStore({ name: "xingliu-ai", consistency: "strong" });
     return await store.get("settings", { type: "json" });
   } catch (err) {
@@ -37,60 +36,68 @@ async function savedSettings() {
 
 exports.handler = async function (event) {
   const h = headers();
-  if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers: h, body: "" };
-  if (event.httpMethod !== "POST") {
-    return { statusCode: 405, headers: h, body: JSON.stringify({ error: { message: "只接受 POST" } }) };
-  }
-
-  let body;
-  try { body = JSON.parse(event.body || "{}"); }
-  catch (err) {
-    return { statusCode: 400, headers: h, body: JSON.stringify({ error: { message: "请求不是 JSON" } }) };
-  }
-  if (!body.messages) {
-    return { statusCode: 400, headers: h, body: JSON.stringify({ error: { message: "缺少 messages" } }) };
-  }
-
-  const saved = await savedSettings();
-  const auth = event.headers.authorization || event.headers.Authorization || "";
-  const userKey = auth.replace(/^Bearer\s+/i, "").trim();
-  const siteKey = (saved && saved.apiKey) || process.env.AI_API_KEY || "";
-  const siteBase = cleanBase((saved && saved.base) || process.env.AI_API_BASE || "https://api.deepseek.com");
-  const textModel = (saved && saved.model) || process.env.AI_MODEL || "deepseek-chat";
-  const visionModel = (saved && saved.visionModel) || process.env.AI_VISION_MODEL || textModel;
-
-  const image = JSON.stringify(body.messages).indexOf("image_url") !== -1;
-  let base;
-  let key;
-  let model;
-  if (userKey) {
-    base = cleanBase(body.base || siteBase);
-    if (!ALLOWED[base]) {
-      return { statusCode: 400, headers: h, body: JSON.stringify({ error: { message: "这个接口不在允许列表里" } }) };
+  try {
+    if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers: h, body: "" };
+    if (event.httpMethod !== "POST") {
+      return { statusCode: 405, headers: h, body: JSON.stringify({ error: { message: "只接受 POST" } }) };
     }
-    key = userKey;
-    model = body.model || (image ? visionModel : textModel);
-  } else if (siteKey) {
-    base = siteBase;
-    key = siteKey;
-    model = image ? visionModel : textModel;
-  } else {
-    return { statusCode: 401, headers: h, body: JSON.stringify({ error: { message: "未配置 API Key" } }) };
+
+    let body;
+    try { body = JSON.parse(event.body || "{}"); }
+    catch (err) {
+      return { statusCode: 400, headers: h, body: JSON.stringify({ error: { message: "请求不是 JSON" } }) };
+    }
+    if (!body.messages) {
+      return { statusCode: 400, headers: h, body: JSON.stringify({ error: { message: "缺少 messages" } }) };
+    }
+
+    const saved = await savedSettings();
+    const auth = event.headers.authorization || event.headers.Authorization || "";
+    const userKey = auth.replace(/^Bearer\s+/i, "").trim();
+    const siteKey = (saved && saved.apiKey) || process.env.AI_API_KEY || "";
+    const siteBase = cleanBase((saved && saved.base) || process.env.AI_API_BASE || "https://api.deepseek.com");
+    const textModel = (saved && saved.model) || process.env.AI_MODEL || "deepseek-chat";
+    const visionModel = (saved && saved.visionModel) || process.env.AI_VISION_MODEL || textModel;
+
+    const image = JSON.stringify(body.messages).indexOf("image_url") !== -1;
+    let base;
+    let key;
+    let model;
+    if (userKey) {
+      base = cleanBase(body.base || siteBase);
+      if (!ALLOWED[base]) {
+        return { statusCode: 400, headers: h, body: JSON.stringify({ error: { message: "这个接口不在允许列表里" } }) };
+      }
+      key = userKey;
+      model = body.model || (image ? visionModel : textModel);
+    } else if (siteKey) {
+      base = siteBase;
+      key = siteKey;
+      model = image ? visionModel : textModel;
+    } else {
+      return { statusCode: 401, headers: h, body: JSON.stringify({ error: { message: "未配置 API Key：请在 Netlify 设置 AI_API_KEY，或打开 /setup.html 保存密钥" } }) };
+    }
+
+    const payload = {
+      model: model,
+      messages: body.messages,
+      temperature: typeof body.temperature === "number" ? body.temperature : 0.35,
+      max_tokens: body.max_tokens || 5500
+    };
+    if (body.tools) payload.tools = body.tools;
+
+    const response = await fetch(base + "/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
+      body: JSON.stringify(payload)
+    });
+    const text = await response.text();
+    return { statusCode: response.status, headers: h, body: text };
+  } catch (err) {
+    return {
+      statusCode: 500,
+      headers: h,
+      body: JSON.stringify({ error: { message: "解读服务异常：" + String((err && err.message) || err).slice(0, 160) } })
+    };
   }
-
-  const payload = {
-    model: model,
-    messages: body.messages,
-    temperature: typeof body.temperature === "number" ? body.temperature : 0.35,
-    max_tokens: body.max_tokens || 5500
-  };
-  if (body.tools) payload.tools = body.tools;
-
-  const response = await fetch(base + "/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
-    body: JSON.stringify(payload)
-  });
-  const text = await response.text();
-  return { statusCode: response.status, headers: h, body: text };
 };

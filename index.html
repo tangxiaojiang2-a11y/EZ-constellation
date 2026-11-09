@@ -2021,9 +2021,9 @@ function buildTrendAIPrompt(chart, horizon){
   return { system: sys, user: user };
 }
 function buildZodiacAIPrompt(d, gender){
-  var sys = complianceSys() + '\n【输出格式】严格按以下九个小节输出，小节标题必须原样保留：\n【人群大数据画像】【性格优劣势】【工作学业】【金钱消费】【恋爱模式】【友情社交】【沟通锦囊】【心动与相处】【雷区与充电】\n每段必须点到元素、模式、守护星或对宫之一。';
+  var sys = complianceSys() + '\n【输出格式】必须按顺序输出以下六个小节，标题原样保留、每节2-3段：\n【人群大数据画像】\n【性格优劣势】\n【恋爱与相处】\n【沟通锦囊】\n【工作学业】\n【雷区与充电】\n每段点到元素、模式、守护星或对宫之一。不要输出标题列表之外的内容。';
   var user = JSON.stringify({
-    任务:'写一份多维度太阳星座深度画像，覆盖用户最想看的生活面向。',
+    任务:'写一份多维度太阳星座深度画像。',
     星座: d.name, 视角: gender === 'male' ? '他' : '她',
     元素: d.element, 模式: d.fact && d.fact.mode, 阴阳: d.fact && d.fact.polarity,
     守护星: rulerText(d.fact), 对宫: d.fact && d.fact.opposite, 关键词: d.fact && d.fact.keys,
@@ -2127,13 +2127,19 @@ function mergeSectionsAI(txt, report){
 /* ---------- AI 输出通用分节解析（嵌入式 AI 区块用） ---------- */
 function parseAISections(txt){
   if (!txt) return null;
-  var re = /【(.+?)】/g, parts = [], m;
-  while ((m = re.exec(txt)) !== null) parts.push({ title: m[1], start: re.lastIndex });
-  if (!parts.length) return null;
+  var cleaned = String(txt).replace(/\r/g, '').replace(/\*\*/g, '').trim();
+  var re = /【\s*([^】]+?)\s*】/g, parts = [], m;
+  while ((m = re.exec(cleaned)) !== null){
+    parts.push({ title: m[1].trim(), start: re.lastIndex, headLen: m[0].length });
+  }
+  if (!parts.length){
+    var paras = compliance(cleaned).split(/\n+/).filter(function(x){ return x.trim(); });
+    return paras.length ? [{ title: '深度解读', paras: paras.slice(0, 12) }] : null;
+  }
   var out = [];
   parts.forEach(function(p, i){
-    var end = i + 1 < parts.length ? parts[i+1].start - ('【' + parts[i+1].title + '】').length : txt.length;
-    var paras = compliance(txt.slice(p.start, end).trim()).split(/\n+/).filter(function(x){ return x.trim(); });
+    var end = i + 1 < parts.length ? (parts[i+1].start - parts[i+1].headLen) : cleaned.length;
+    var paras = compliance(cleaned.slice(p.start, end).trim()).split(/\n+/).filter(function(x){ return x.trim(); });
     if (paras.length) out.push({ title: p.title, paras: paras });
   });
   return out.length ? out : null;
@@ -2352,12 +2358,10 @@ function _aiFetch(body, timeoutMs){
   if (aiHosted()){
     url = '/.netlify/functions/ai';
     if (cfg.key){
-      // setup.html 保存在本机的密钥：随请求带上，函数按白名单转发
       headers.Authorization = 'Bearer ' + cfg.key;
       body.base = cfg.base;
       if (!body.model) body.model = cfg.model;
     } else {
-      // 无本机密钥时，走站点 Blobs / 环境变量
       delete body.model;
       delete body.base;
     }
@@ -2367,7 +2371,7 @@ function _aiFetch(body, timeoutMs){
     return Promise.reject(new Error('未配置 API Key'));
   }
   var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-  var timer = ctrl ? setTimeout(function(){ ctrl.abort(); }, timeoutMs || 60000) : null;
+  var timer = ctrl ? setTimeout(function(){ ctrl.abort(); }, timeoutMs || 90000) : null;
   return fetch(url, {
     method: 'POST',
     headers: headers,
@@ -2375,12 +2379,19 @@ function _aiFetch(body, timeoutMs){
     signal: ctrl ? ctrl.signal : undefined
   }).then(function(r){
     if (timer) clearTimeout(timer);
-    return r.json();
-  }).then(function(j){
-    if (j && j.error && j.error.message) throw new Error(j.error.message);
-    var txt = j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
-    if (!txt) throw new Error('AI 返回为空');
-    return txt;
+    return r.text().then(function(raw){
+      var j = null;
+      try { j = raw ? JSON.parse(raw) : null; }
+      catch (e){ throw new Error(r.ok ? 'AI 返回格式异常' : ('解读服务异常 ' + r.status)); }
+      if (!r.ok){
+        var msg = (j && j.error && j.error.message) ? String(j.error.message) : ('解读服务异常 ' + r.status);
+        throw new Error(msg);
+      }
+      if (j && j.error && j.error.message) throw new Error(j.error.message);
+      var txt = j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+      if (!txt) throw new Error('AI 返回为空，请检查模型密钥与模型名');
+      return txt;
+    });
   }).catch(function(err){
     if (timer) clearTimeout(timer);
     throw err;
@@ -3546,50 +3557,60 @@ function showZodiacDetail(key){
     + '<span class="chip rose">' + esc(d.bestWith[0]) + '最搭</span>'
     + '</div></div>';
   html += seg;
-  if (!aiReady()){
-    var sec = function(icon, title, paras, lists){
-      var h = '<div class="sec"><div class="sec-head"><span class="no">' + (++sec._n) + '</span><h2>' + title + '</h2></div><div class="card">';
-      paras.forEach(function(x){ h += '<p>' + esc(x) + '</p>'; });
-      (lists || []).forEach(function(it){
-        h += '<div class="kv-list"><div class="kv"><span class="k">' + esc(it.k) + '</span><span class="v">' + esc(it.v) + '</span></div></div>';
-      });
-      return h + '</div></div>';
-    };
-    sec._n = 0;
-    html += sec('🪞', '性格底色', [
-      d.base,
-      '往里看一层：' + d.inner,
-      '社交中的' + (zodiacGender === 'male' ? '他' : '她') + '：' + d.social
-    ], [ { k:'最大优点', v: d.strength }, { k:'隐性短板', v: d.weakness } ]);
-    html += sec('💫', '性格魅力', [ d.charm ]);
-    html += sec('💘', '心动与择偶', [ d.want, '感情观加成：' + CONST_KB[key].love ], [ { k:'最适配', v: d.bestWith.join('、') }, { k:'需磨合', v: d.hardWith.join('、') } ]);
-    html += sec('🗣️', '怎么和' + (zodiacGender === 'male' ? '他' : '她') + '沟通', [ d.talk ], [ { k:'雷区预警', v: d.avoid }, { k:'TA讨厌的事', v: CONST_KB[key].mine } ]);
-    html += sec('🎡', '约会与相处场景', [ d.scene, '快乐清单参考：' + d.hobbies.join('、') + '。' ]);
-  } else {
-    html += '<div class="card" style="margin-top:14px;"><p style="font-size:13px;line-height:1.9;color:var(--sub);">' + esc(d.base) + '</p></div>';
-  }
+  var sec = function(icon, title, paras, lists){
+    var h = '<div class="sec"><div class="sec-head"><span class="no">' + (++sec._n) + '</span><h2>' + title + '</h2></div><div class="card">';
+    paras.forEach(function(x){ h += '<p>' + esc(x) + '</p>'; });
+    (lists || []).forEach(function(it){
+      h += '<div class="kv-list"><div class="kv"><span class="k">' + esc(it.k) + '</span><span class="v">' + esc(it.v) + '</span></div></div>';
+    });
+    return h + '</div></div>';
+  };
+  sec._n = 0;
+  html += '<div id="zodiacLocalDims">';
+  html += sec('🪞', '性格底色', [
+    d.base,
+    '往里看一层：' + d.inner,
+    '社交中的' + (zodiacGender === 'male' ? '他' : '她') + '：' + d.social
+  ], [ { k:'最大优点', v: d.strength }, { k:'隐性短板', v: d.weakness } ]);
+  html += sec('💫', '性格魅力', [ d.charm ]);
+  html += sec('💘', '心动与择偶', [ d.want, '感情观加成：' + CONST_KB[key].love ], [ { k:'最适配', v: d.bestWith.join('、') }, { k:'需磨合', v: d.hardWith.join('、') } ]);
+  html += sec('🗣️', '怎么和' + (zodiacGender === 'male' ? '他' : '她') + '沟通', [ d.talk ], [ { k:'雷区预警', v: d.avoid }, { k:'TA讨厌的事', v: CONST_KB[key].mine } ]);
+  html += sec('🎡', '约会与相处场景', [ d.scene, '快乐清单参考：' + d.hobbies.join('、') + '。' ]);
+  html += '</div>';
   html += '<div id="zodiacAIBox"></div>';
   html += '<div class="card" style="margin-top:14px;"><button class="btn-main" onclick="switchTab(\'east\')">去起一卦</button></div>';
   $('zodiacDetail').innerHTML = html;
   $('zodiacDetail').scrollIntoView({ behavior:'smooth', block:'nearest' });
   renderZodiacAI(key, d);
 }
-/* 星座详情 · AI 大数据解读（自动触发，带缓存，失败静默隐藏） */
+/* 星座详情 · AI 深度解读（成功后替换本地长文；失败保留本地并提示） */
 function renderZodiacAI(key, d){
   var box = $('zodiacAIBox'); if (!box) return;
   window._zAICache = window._zAICache || {};
-  var cacheKey = 'v2:' + zodiacGender + ':' + key;
+  var cacheKey = 'v3:' + zodiacGender + ':' + key;
   if (!aiReady()){ box.innerHTML = ''; return; }
-  if (window._zAICache[cacheKey]){ box.innerHTML = window._zAICache[cacheKey]; return; }
-  box.innerHTML = '<div class="card" style="margin-top:14px;text-align:center;padding:18px 0;"><p style="font-size:13px;color:var(--sub);">正在生成九维深度星座报告…</p></div>';
+  if (window._zAICache[cacheKey]){
+    box.innerHTML = window._zAICache[cacheKey];
+    var localOk = $('zodiacLocalDims'); if (localOk) localOk.style.display = 'none';
+    return;
+  }
+  box.innerHTML = '<div class="card" style="margin-top:14px;text-align:center;padding:18px 0;"><p style="font-size:13px;color:var(--sub);">模型正在生成深度星座报告…</p></div>';
   var pr = buildZodiacAIPrompt(d, zodiacGender);
   callAI(pr.system, pr.user).then(function(txt){
     var secs = parseAISections(txt);
-    if (!secs || secs.length < 4){ box.innerHTML = ''; return; }
-    var h = renderAIDimCard('深度分析 · ' + d.name + ' · ' + d.genderLabel, secs, '覆盖性格、工作、金钱、恋爱、社交等维度，仅供娱乐参考。');
+    if (!secs || !secs.length){
+      box.innerHTML = '<div class="card" style="margin-top:14px;"><p class="tip">模型已返回，但格式无法解析，已保留上方本地解读。</p></div>';
+      return;
+    }
+    var h = renderAIDimCard('深度分析 · ' + d.name + ' · ' + d.genderLabel, secs, '由站点模型生成，仅供娱乐参考。');
     window._zAICache[cacheKey] = h;
     box.innerHTML = h;
-  }).catch(function(){ box.innerHTML = ''; });
+    var localBox = $('zodiacLocalDims'); if (localBox) localBox.style.display = 'none';
+  }).catch(function(err){
+    var msg = (err && err.message) ? String(err.message).slice(0, 120) : '模型暂时不可用';
+    box.innerHTML = '<div class="card" style="margin-top:14px;"><p class="tip">深度分析未生成：' + esc(msg) + '。上方本地解读仍可阅读。可检查 Netlify 环境变量或打开 /setup.html 保存密钥后重试。</p>'
+      + '<button class="btn-ghost" onclick="window._zAICache={};showZodiacDetail(\'' + key + '\')">重新生成</button></div>';
+  });
 }
 function setZodiacGender(g, key){
   zodiacGender = g;
@@ -3651,16 +3672,22 @@ function renderPairAI(k1, k2, r){
     var localBox = $('pairLocalDims'); if (localBox) localBox.style.display = 'none';
     return;
   }
-  box.innerHTML = '<div class="card" style="margin-top:14px;text-align:center;padding:18px 0;"><p style="font-size:13px;color:var(--sub);">正在生成十维深度配对报告…</p></div>';
+  box.innerHTML = '<div class="card" style="margin-top:14px;text-align:center;padding:18px 0;"><p style="font-size:13px;color:var(--sub);">正在生成深度配对报告…</p></div>';
   var pr = buildPairAIPrompt(r);
   callAI(pr.system, pr.user).then(function(txt){
     var secs = parseAISections(txt);
-    if (!secs || secs.length < 4){ box.innerHTML = ''; return; }
-    var h = renderAIDimCard('深度配对分析 · ' + r.name1 + ' × ' + r.name2, secs, '由站点模型生成多维报告，仅供娱乐参考——真实契合由你们自己书写。');
+    if (!secs || !secs.length){
+      box.innerHTML = '<div class="card" style="margin-top:14px;"><p class="tip">模型已返回，但格式无法解析，已保留上方速览。</p></div>';
+      return;
+    }
+    var h = renderAIDimCard('深度配对分析 · ' + r.name1 + ' × ' + r.name2, secs, '由站点模型生成多维报告，仅供娱乐参考。');
     window._pAICache[cacheKey] = h;
     box.innerHTML = h;
     var localBox = $('pairLocalDims'); if (localBox) localBox.style.display = 'none';
-  }).catch(function(){ box.innerHTML = ''; });
+  }).catch(function(err){
+    var msg = (err && err.message) ? String(err.message).slice(0, 120) : '模型暂时不可用';
+    box.innerHTML = '<div class="card" style="margin-top:14px;"><p class="tip">深度配对未生成：' + esc(msg) + '。上方速览仍可阅读。</p></div>';
+  });
 }
 
 /* ==UI-END== */
