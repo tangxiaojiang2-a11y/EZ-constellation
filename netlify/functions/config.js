@@ -73,15 +73,16 @@ exports.handler = async function (event) {
 
   let saved = null;
   try { saved = await readSettings(); }
-  catch (err) {
-    return { statusCode: 500, headers: h, body: JSON.stringify({ error: { message: "读不到站点存储，确认已经部署到 Netlify" } }) };
-  }
+  catch (err) { saved = null; }
 
   if (action === "status") {
     return {
       statusCode: 200,
       headers: h,
-      body: JSON.stringify({ view: publicView(saved) })
+      body: JSON.stringify({
+        view: publicView(saved),
+        blobsOk: !!saved || saved === null
+      })
     };
   }
 
@@ -103,7 +104,15 @@ exports.handler = async function (event) {
     try {
       await openStore().setJSON("settings", next);
     } catch (err) {
-      return { statusCode: 500, headers: h, body: JSON.stringify({ error: { message: "保存失败，请稍后再试" } }) };
+      return {
+        statusCode: 200,
+        headers: h,
+        body: JSON.stringify({
+          ok: false,
+          localOnly: true,
+          error: { message: "站点存储暂不可用，请以本机保存为准；全站密钥请在 Netlify 设置 AI_API_KEY" }
+        })
+      };
     }
     return { statusCode: 200, headers: h, body: JSON.stringify({ ok: true, view: publicView(next) }) };
   }

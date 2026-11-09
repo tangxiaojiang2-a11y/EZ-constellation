@@ -54,9 +54,24 @@ exports.handler = async function (event) {
     const saved = await savedSettings();
     const auth = event.headers.authorization || event.headers.Authorization || "";
     const userKey = auth.replace(/^Bearer\s+/i, "").trim();
-    const siteKey = (saved && saved.apiKey) || process.env.AI_API_KEY || "";
-    const siteBase = cleanBase((saved && saved.base) || process.env.AI_API_BASE || "https://api.deepseek.com");
-    const textModel = (saved && saved.model) || process.env.AI_MODEL || "deepseek-chat";
+    // 兼容常见变量名，避免后台起了别名却读不到
+    const siteKey = (saved && saved.apiKey)
+      || process.env.AI_API_KEY
+      || process.env.DEEPSEEK_API_KEY
+      || process.env.OPENAI_API_KEY
+      || "";
+    const siteBase = cleanBase(
+      (saved && saved.base)
+      || process.env.AI_API_BASE
+      || process.env.DEEPSEEK_API_BASE
+      || process.env.OPENAI_BASE_URL
+      || "https://api.deepseek.com"
+    );
+    const textModel = (saved && saved.model)
+      || process.env.AI_MODEL
+      || process.env.DEEPSEEK_MODEL
+      || process.env.OPENAI_MODEL
+      || "deepseek-chat";
     const visionModel = (saved && saved.visionModel) || process.env.AI_VISION_MODEL || textModel;
 
     const image = JSON.stringify(body.messages).indexOf("image_url") !== -1;
