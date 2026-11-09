@@ -1,0 +1,32 @@
+{
+  "name": "星六 · 星座×小六壬",
+  "short_name": "星六",
+  "description": "星座、小六壬、塔罗和灵数趣味解读，仅供娱乐。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#171326",
+  "theme_color": "#171326",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

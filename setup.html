@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>星六 · 站点配置</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root {
+    --bg:#171326; --card:#241c38; --raised:#312848;
+    --ink:#f7f2ff; --sub:#c9bddf; --dim:#9b90b6;
+    --line:rgba(247,242,255,.12); --accent:#ff6b8a; --accent-ink:#2a1020;
+    --ok:#4cc38a; --bad:#e5484d;
+  }
+  body {
+    font-family:"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg); color:var(--ink); min-height:100%;
+    font-size:15px; line-height:1.55;
+  }
+  main { max-width:720px; margin:0 auto; padding:32px 20px 64px; }
+  h1 { font-size:32px; font-weight:500; letter-spacing:0; }
+  .lead { margin-top:8px; color:var(--sub); font-size:14px; }
+  .status {
+    margin-top:20px; padding:14px 16px; border-radius:12px;
+    background:var(--raised); border:1px solid var(--line); color:var(--sub); font-size:14px;
+  }
+  .status.ok { color:var(--ok); }
+  .status.bad { color:var(--bad); }
+  ol.flow { list-style:none; margin-top:28px; }
+  ol.flow > li { display:flex; gap:14px; margin-top:22px; }
+  .no {
+    width:28px; height:28px; flex-shrink:0; border-radius:8px;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(255,107,138,.16); color:var(--accent); font-size:14px;
+  }
+  .step h2 { font-size:16px; font-weight:500; }
+  .step p { margin-top:6px; color:var(--sub); font-size:14px; }
+  code {
+    font-family:ui-monospace,Consolas,monospace; font-size:13px;
+    color:var(--ink); background:var(--raised); padding:1px 6px; border-radius:4px;
+  }
+  form {
+    margin-top:14px; background:var(--card); border:1px solid var(--line);
+    border-radius:16px; padding:16px;
+  }
+  .plats { display:flex; flex-wrap:wrap; gap:8px; }
+  .plat {
+    border:1px solid var(--line); background:var(--raised); color:var(--sub);
+    border-radius:8px; padding:8px 12px; cursor:pointer; font:inherit; font-size:13px;
+  }
+  .plat.on { color:var(--ink); border-color:rgba(255,107,138,.55); background:rgba(255,107,138,.14); }
+  label { display:block; margin-top:14px; font-size:12px; color:var(--sub); }
+  input {
+    width:100%; margin-top:6px; height:44px; padding:0 12px; border-radius:8px;
+    border:1px solid var(--line); background:var(--raised); color:var(--ink); font:inherit; font-size:15px;
+  }
+  input:focus { outline:2px solid var(--accent); outline-offset:2px; }
+  .row { display:flex; gap:8px; margin-top:16px; }
+  button.act {
+    height:44px; padding:0 16px; border:none; border-radius:12px; cursor:pointer;
+    font:inherit; font-size:15px; font-weight:500;
+  }
+  button.primary { background:var(--accent); color:var(--accent-ink); }
+  button.ghost { background:var(--raised); color:var(--ink); border:1px solid var(--line); }
+  .hint { margin-top:10px; font-size:12px; color:var(--dim); }
+  a { color:var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>站点配置</h1>
+  <p class="lead">这一页不放在用户首页里。在这里填写并保存模型密钥到本机浏览器。首页会自动读取，用户看不到配置入口。</p>
+  <div class="status" id="status">正在读取本地配置…</div>
+
+  <ol class="flow">
+    <li>
+      <span class="no">1</span>
+      <div class="step">
+        <h2>打开本页</h2>
+        <p>部署后地址是 <code>https://你的域名/setup.html</code>。本地预览也可以直接打开本页填写。</p>
+      </div>
+    </li>
+    <li>
+      <span class="no">2</span>
+      <div class="step">
+        <h2>填写并保存密钥</h2>
+        <p>选平台，填 API Key 后点保存。密钥保存在本机浏览器，无需管理员口令。</p>
+        <form id="form">
+          <div class="plats" id="plats"></div>
+          <label>接口地址
+            <input id="base" name="base" autocomplete="off" required>
+          </label>
+          <label>文本模型
+            <input id="model" name="model" autocomplete="off" required>
+          </label>
+          <label>视觉模型 <span style="color:var(--dim)">拍照解读用，可以留空</span>
+            <input id="vision" name="vision" autocomplete="off">
+          </label>
+          <label>API Key
+            <input id="apiKey" name="apiKey" type="password" autocomplete="off" required>
+          </label>
+          <div class="row">
+            <button class="act primary" type="submit">保存密钥</button>
+            <button class="act ghost" type="button" id="testBtn">测试连接</button>
+          </div>
+          <p class="hint">豆包要填火山方舟的接入点 ID，一般以 <code>ep-</code> 开头。密钥保存在本机；部署到 Netlify 时会尽量同步到站点，方便全站调用。</p>
+        </form>
+      </div>
+    </li>
+    <li>
+      <span class="no">3</span>
+      <div class="step">
+        <h2>回到首页使用</h2>
+        <p>保存成功后打开 <a href="index.html">首页</a>。用户只使用功能，「我的」里没有密钥配置。</p>
+      </div>
+    </li>
+  </ol>
+</main>
+<script>
+var PRESETS = [
+  { id:"deepseek", name:"DeepSeek", base:"https://api.deepseek.com", model:"deepseek-chat", vision:"" },
+  { id:"doubao", name:"豆包", base:"https://ark.cn-beijing.volces.com/api/v3", model:"", vision:"" },
+  { id:"kimi", name:"Kimi", base:"https://api.moonshot.cn/v1", model:"kimi-k3", vision:"kimi-latest" },
+  { id:"qwen", name:"通义千问", base:"https://dashscope.aliyuncs.com/compatible-mode/v1", model:"qwen-plus", vision:"qwen-vl-plus" },
+  { id:"hunyuan", name:"腾讯混元", base:"https://api.hunyuan.cloud.tencent.com/v1", model:"hunyuan-lite", vision:"hunyuan-turbo-vision" },
+  { id:"zhipu", name:"智谱", base:"https://open.bigmodel.cn/api/paas/v4", model:"glm-4-flash", vision:"glm-4.5v" },
+  { id:"openai", name:"OpenAI", base:"https://api.openai.com/v1", model:"gpt-4o-mini", vision:"gpt-4o-mini" }
+];
+var current = "deepseek";
+var statusEl = document.getElementById("status");
+
+function setStatus(text, kind){
+  statusEl.textContent = text;
+  statusEl.className = "status" + (kind ? " " + kind : "");
+}
+function tail(key){
+  var t = String(key || "");
+  return t.length >= 4 ? t.slice(-4) : "";
+}
+function readLocal(){
+  return {
+    key: localStorage.getItem("xlren_ai_key") || "",
+    base: (localStorage.getItem("xlren_ai_base") || "").replace(/\/+$/, ""),
+    model: localStorage.getItem("xlren_ai_model") || "",
+    vision: localStorage.getItem("xlren_ai_vision") || "",
+    preset: localStorage.getItem("xlren_ai_preset") || "deepseek",
+    on: localStorage.getItem("xlren_ai_on") === "1"
+  };
+}
+function saveLocal(cfg){
+  localStorage.setItem("xlren_ai_on", "1");
+  localStorage.setItem("xlren_ai_key", cfg.apiKey);
+  localStorage.setItem("xlren_ai_base", cfg.base);
+  localStorage.setItem("xlren_ai_model", cfg.model);
+  localStorage.setItem("xlren_ai_vision", cfg.visionModel || "");
+  localStorage.setItem("xlren_ai_preset", current || "deepseek");
+}
+function applyPreset(id, keepModel){
+  current = id;
+  var p = PRESETS.filter(function(x){ return x.id === id; })[0];
+  document.getElementById("base").value = p.base;
+  if (!keepModel){
+    document.getElementById("model").value = p.model;
+    document.getElementById("vision").value = p.vision;
+  }
+  document.getElementById("model").placeholder = p.id === "doubao" ? "ep- 开头的接入点 ID" : "";
+  var buttons = document.querySelectorAll(".plat");
+  for (var i = 0; i < buttons.length; i++) buttons[i].classList.toggle("on", buttons[i].getAttribute("data-id") === id);
+}
+function paintPlats(){
+  var box = document.getElementById("plats");
+  box.innerHTML = PRESETS.map(function(p){
+    return '<button type="button" class="plat" data-id="' + p.id + '">' + p.name + '</button>';
+  }).join("");
+  var buttons = box.querySelectorAll(".plat");
+  for (var i = 0; i < buttons.length; i++){
+    buttons[i].onclick = function(){ applyPreset(this.getAttribute("data-id")); };
+  }
+}
+function matchPreset(base){
+  var b = String(base || "").replace(/\/+$/, "");
+  for (var i = 0; i < PRESETS.length; i++){
+    if (PRESETS[i].base.replace(/\/+$/, "") === b) return PRESETS[i].id;
+  }
+  return "deepseek";
+}
+function showLocalStatus(){
+  var loc = readLocal();
+  if (!loc.key){
+    setStatus("本机还没有密钥。选平台、填 API Key 后点保存即可。", "");
+    applyPreset(current);
+    return;
+  }
+  current = loc.preset && PRESETS.some(function(p){ return p.id === loc.preset; })
+    ? loc.preset
+    : matchPreset(loc.base);
+  applyPreset(current, true);
+  if (loc.base) document.getElementById("base").value = loc.base;
+  if (loc.model) document.getElementById("model").value = loc.model;
+  document.getElementById("vision").value = loc.vision || "";
+  document.getElementById("apiKey").value = loc.key;
+  var tip = "已保存在本机 · " + (loc.model || "未填模型");
+  if (tail(loc.key)) tip += " · 尾号 " + tail(loc.key);
+  setStatus(tip, "ok");
+}
+function callConfig(payload){
+  return fetch("/.netlify/functions/config", {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify(payload)
+  }).then(function(r){
+    return r.json().then(function(j){ return { status:r.status, body:j }; });
+  });
+}
+function formCfg(){
+  return {
+    apiKey: document.getElementById("apiKey").value.trim(),
+    base: document.getElementById("base").value.trim().replace(/\/+$/, ""),
+    model: document.getElementById("model").value.trim(),
+    visionModel: document.getElementById("vision").value.trim()
+  };
+}
+document.getElementById("form").onsubmit = function(e){
+  e.preventDefault();
+  var cfg = formCfg();
+  if (!cfg.apiKey){ setStatus("请填写 API Key", "bad"); return; }
+  if (!cfg.model){ setStatus("请填写文本模型", "bad"); return; }
+  saveLocal(cfg);
+  showLocalStatus();
+  setStatus("已保存到本机。正在尝试同步站点…", "ok");
+  callConfig({
+    action:"save",
+    apiKey: cfg.apiKey,
+    base: cfg.base,
+    model: cfg.model,
+    visionModel: cfg.visionModel
+  }).then(function(res){
+    if (res.body && res.body.error){
+      setStatus("本机已保存。站点同步跳过：" + res.body.error.message, "ok");
+      return;
+    }
+    var tip = "本机与站点都已保存 · " + cfg.model;
+    if (tail(cfg.apiKey)) tip += " · 尾号 " + tail(cfg.apiKey);
+    setStatus(tip, "ok");
+  }).catch(function(){
+    setStatus("本机已保存。当前环境未部署配置接口，首页仍可用本机密钥。", "ok");
+  });
+};
+document.getElementById("testBtn").onclick = function(){
+  var cfg = formCfg();
+  if (!cfg.apiKey){
+    var loc = readLocal();
+    if (!loc.key){ setStatus("请先填写并保存 API Key", "bad"); return; }
+    cfg = { apiKey: loc.key, base: loc.base, model: loc.model, visionModel: loc.vision };
+  }
+  setStatus("正在测试连接…", "");
+  fetch(cfg.base.replace(/\/+$/, "") + "/chat/completions", {
+    method:"POST",
+    headers:{ "Content-Type":"application/json", "Authorization":"Bearer " + cfg.apiKey },
+    body: JSON.stringify({
+      model: cfg.model,
+      messages:[{ role:"user", content:"只回复一个字：好" }],
+      max_tokens:16,
+      temperature:0
+    })
+  }).then(function(r){
+    return r.json().then(function(j){ return { ok:r.ok, body:j }; });
+  }).then(function(res){
+    if (!res.ok){
+      var msg = (res.body && res.body.error && res.body.error.message) ? String(res.body.error.message).slice(0, 180) : "模型没有接通";
+      setStatus(msg, "bad");
+      return;
+    }
+    setStatus("已接通 " + cfg.model, "ok");
+  }).catch(function(){
+    setStatus("网络没有到达模型接口，请检查地址或跨域限制", "bad");
+  });
+};
+paintPlats();
+showLocalStatus();
+</script>
+</body>
+</html>
